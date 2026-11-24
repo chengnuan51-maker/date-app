@@ -1,0 +1,2079 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="AxisDay" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0F172A" />
+  <title>AxisDay · 箭头轴向日程与灵感复盘</title>
+  <link id="pwa-manifest" rel="manifest" />
+  <link id="apple-touch-icon" rel="apple-touch-icon" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-canvas: #E2EAF2;
+      --axis-line: #CBD5E1;
+      --axis-active: #0F172A;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background-color: var(--bg-canvas);
+      color: #0F172A;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .axis-scroll::-webkit-scrollbar {
+      height: 8px;
+      width: 8px;
+    }
+    .axis-scroll::-webkit-scrollbar-track {
+      background: #F1F5F9;
+      border-radius: 9999px;
+    }
+    .axis-scroll::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 9999px;
+    }
+    .axis-scroll::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+    .day-circle-btn {
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  box-shadow 0.22s ease,
+                  background-color 0.2s ease,
+                  border-color 0.2s ease;
+    }
+    .day-circle-btn:hover {
+      transform: translateY(-2px) scale(1.04);
+    }
+    .day-circle-btn.is-pressed {
+      transform: scale(1.06);
+      box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.22), 0 10px 25px -5px rgba(5, 150, 105, 0.35);
+    }
+    .day-circle-btn:active {
+      transform: scale(0.95);
+    }
+    @media (max-width: 640px) {
+      .mobile-sheet-enter {
+        animation: sheetSlideUp 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+      @keyframes sheetSlideUp {
+        from {
+          transform: translateY(100%);
+          opacity: 0.6;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes slideFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .block-animate {
+      animation: slideFadeIn 0.22s ease-out forwards;
+    }
+    .bg-dot-grid {
+      background-image: radial-gradient(#B6C5D6 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+  </style>
+</head>
+<body class="h-[100dvh] overflow-hidden flex flex-col bg-dot-grid pb-16 sm:pb-0 select-none sm:select-auto">
+
+  <!-- Top Minimal Control Bar -->
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-6 py-2.5">
+    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex-shrink-0 flex items-center justify-center shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-4-4l4 4-4 4" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-sm sm:text-base font-bold tracking-tight text-slate-900 leading-tight truncate">AxisDay 箭头日程轴</h1>
+          <p class="text-[11px] text-slate-500 truncate">轻点圆圈展开全天 · <span class="sm:hidden">长按</span><span class="hidden sm:inline">右键</span>圆圈快捷添加</p>
+        </div>
+      </div>
+
+      <!-- Color Tag Legend (Desktop) -->
+      <div class="hidden xl:flex items-center gap-2 text-xs font-medium bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200/80">
+        <span class="inline-flex items-center gap-1.5 text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
+          <span class="w-2 h-2 rounded-full bg-rose-500"></span>待办 · 时间段
+        </span>
+        <span class="inline-flex items-center gap-1.5 text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
+          <span class="w-2 h-2 rounded-full bg-blue-500"></span>打卡 · 进度追踪
+        </span>
+        <span class="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>回顾 · 复盘认知
+        </span>
+        <span class="inline-flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>灵感 · 变现创意
+        </span>
+      </div>
+
+      <!-- Action Controls -->
+      <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+        <button id="btn-header-calendar" type="button" class="px-2.5 py-1.5 text-xs font-semibold rounded-full sm:rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center gap-1" title="展开/收起日历视图">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span>日历视图</span>
+        </button>
+        <button id="btn-jump-today" type="button" class="px-2.5 py-1.5 text-xs font-semibold rounded-full sm:rounded-lg bg-slate-900 sm:bg-slate-100 text-white sm:text-slate-700 hover:bg-slate-800 sm:hover:bg-slate-200 transition-colors">
+          今天
+        </button>
+        <button id="btn-toggle-all" type="button" class="px-2.5 py-1.5 text-xs font-semibold rounded-full sm:rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+          全部按下
+        </button>
+        <button id="btn-toggle-layout" type="button" class="px-2.5 py-1.5 text-xs font-semibold rounded-full sm:rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center gap-1" title="切换横向/纵向箭头轴">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          </svg>
+          <span id="layout-label">横向轴</span>
+        </button>
+        <button id="btn-open-add-period" type="button" class="hidden sm:flex px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white shadow-sm transition-colors items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10" />
+          </svg>
+          <span>时期规划</span>
+        </button>
+        <button id="btn-open-add-day" type="button" class="hidden sm:flex px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-colors items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>新增日期</span>
+        </button>
+        <button id="btn-icloud-login" type="button" class="px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-full sm:rounded-lg bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-colors flex items-center gap-1.5" title="登录 Apple / iCloud 账号并管理云盘备份">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.33c.64-.78 1.08-1.86.96-2.94-.93.04-2.06.62-2.72 1.4-.58.68-1.1 1.78-.96 2.84 1.04.08 2.08-.52 2.72-1.3z"/>
+          </svg>
+          <span id="icloud-btn-label">iCloud 登录</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Floating Compact Calendar Popover Card -->
+  <section id="calendar-overview-section" class="hidden fixed top-[56px] left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 z-40 w-[calc(100vw-24px)] max-w-[320px] bg-white/98 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-xl p-2.5 transition-all">
+    <div class="w-full">
+      <div class="flex items-center justify-between gap-1.5">
+        <div class="flex items-center gap-1">
+          <button id="btn-cal-prev-month" type="button" class="p-0.5 rounded hover:bg-slate-100 text-slate-600 transition-colors" title="上个月">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <span id="cal-month-title" class="text-xs font-bold text-slate-800 min-w-[72px] text-center">2026年 11月</span>
+          <button id="btn-cal-next-month" type="button" class="p-0.5 rounded hover:bg-slate-100 text-slate-600 transition-colors" title="下个月">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span id="cal-active-count" class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">已写 0 天</span>
+          <button id="btn-toggle-calendar" type="button" class="text-[10px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors">
+            关闭
+          </button>
+        </div>
+      </div>
+
+      <div id="calendar-grid-wrapper" class="mt-2">
+        <div class="grid grid-cols-7 gap-1 text-center text-[9px] font-semibold text-slate-400 mb-1">
+          <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+        </div>
+        <div id="calendar-days-grid" class="grid grid-cols-7 gap-1"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Arrow Axis Workspace -->
+  <main class="flex-1 min-h-0 flex flex-col relative overflow-hidden">
+    <div id="axis-viewport" class="axis-scroll w-full flex-1 min-h-0 overflow-x-auto overflow-y-auto px-3 sm:px-10 py-4 sm:py-6 touch-pan-x touch-pan-y"></div>
+  </main>
+
+  <!-- Mobile Bottom Action Dock -->
+  <nav class="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-2 flex items-center justify-around gap-1.5 shadow-[0_-4px_20px_rgba(15,23,42,0.06)]">
+    <button id="btn-mobile-add-checkin" type="button" class="flex-1 py-2 px-2 rounded-xl bg-blue-600 active:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1 shadow-xs">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      <span>习惯打卡</span>
+    </button>
+    <button id="btn-mobile-add-period" type="button" class="flex-1 py-2 px-2 rounded-xl bg-violet-600 active:bg-violet-700 text-white text-xs font-semibold flex items-center justify-center gap-1 shadow-xs">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span>时期规划</span>
+    </button>
+    <button id="btn-mobile-add-day" type="button" class="py-2 px-3 rounded-xl bg-slate-900 active:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-1 shadow-xs" title="新增日期">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    </button>
+  </nav>
+
+  <!-- Bottom Status / Hint Bar (Desktop) -->
+  <footer class="hidden sm:block bg-white/85 backdrop-blur-sm border-t border-slate-200/80 px-4 sm:px-6 py-2.5 text-xs text-slate-500">
+    <div class="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div id="stats-summary" class="flex items-center gap-4 font-medium text-slate-600"></div>
+      <div class="flex items-center gap-3">
+        <span class="hidden md:inline text-slate-400">右键日期圆圈快捷添加 · 数据自动保存在本地</span>
+        <button id="btn-export-backup" type="button" class="text-slate-600 hover:text-slate-900 font-medium underline underline-offset-2 transition-colors">
+          导出备份
+        </button>
+        <button id="btn-import-backup" type="button" class="text-slate-600 hover:text-slate-900 font-medium underline underline-offset-2 transition-colors">
+          导入恢复
+        </button>
+        <input id="input-import-file" type="file" accept=".json,application/json" class="hidden" />
+        <button id="btn-reset-demo" type="button" class="text-slate-400 hover:text-slate-700 underline underline-offset-2 transition-colors">
+          恢复示例数据
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modal: Add Item to Day -->
+  <div id="modal-add-item" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-xs p-0 sm:p-4">
+    <div class="mobile-sheet-enter bg-white rounded-t-3xl sm:rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-5 pb-7 sm:pb-5">
+      <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 sm:hidden"></div>
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <span id="modal-item-badge" class="w-3 h-3 rounded-full bg-blue-500"></span>
+          <h2 id="modal-item-title" class="text-base font-bold text-slate-900">添加记录</h2>
+        </div>
+        <button id="btn-close-add-item" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <form id="form-add-item" class="space-y-4">
+        <input type="hidden" id="item-target-type" />
+
+        <div id="field-target-date-select">
+          <label for="select-item-date" class="block text-xs font-semibold text-slate-700 mb-1">选择日期</label>
+          <select id="select-item-date" class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"></select>
+        </div>
+
+        <div id="field-time-slot" class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="input-start-time" class="block text-xs font-semibold text-slate-700 mb-1">开始时间</label>
+            <input id="input-start-time" type="time" value="09:00" class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label for="input-end-time" class="block text-xs font-semibold text-slate-700 mb-1">结束时间</label>
+            <input id="input-end-time" type="time" value="10:30" class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+
+        <div id="field-subtag" class="hidden">
+          <label for="input-subtag" class="block text-xs font-semibold text-slate-700 mb-1">分类标签</label>
+          <select id="input-subtag" class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"></select>
+        </div>
+
+        <div>
+          <label for="input-item-text" class="block text-xs font-semibold text-slate-700 mb-1">内容</label>
+          <textarea id="input-item-text" rows="3" required placeholder="输入具体内容..." class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-1">
+          <button id="btn-cancel-add-item" type="button" class="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl sm:rounded-lg transition-colors">取消</button>
+          <button id="btn-submit-add-item" type="submit" class="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl sm:rounded-lg transition-colors">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add / Edit Period Plan -->
+  <div id="modal-add-period" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-xs p-0 sm:p-4">
+    <div class="mobile-sheet-enter bg-white rounded-t-3xl sm:rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-5 pb-7 sm:pb-5 max-h-[90dvh] overflow-y-auto">
+      <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 sm:hidden"></div>
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modal-period-title" class="text-base font-bold text-slate-900">添加时期规划</h2>
+        <button id="btn-close-add-period" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <form id="form-add-period" class="space-y-4">
+        <input type="hidden" id="period-edit-id" />
+        <div>
+          <label for="input-period-title" class="block text-xs font-semibold text-slate-700 mb-1">阶段 / 时期名称</label>
+          <input id="input-period-title" type="text" required maxlength="32" placeholder="例如：第一阶段：内容打磨与测试" class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="input-period-start" class="block text-xs font-semibold text-slate-700 mb-1">开始日期</label>
+            <input id="input-period-start" type="date" required class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          </div>
+          <div>
+            <label for="input-period-end" class="block text-xs font-semibold text-slate-700 mb-1">结束日期</label>
+            <input id="input-period-end" type="date" required class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          </div>
+        </div>
+        <div>
+          <span class="block text-xs font-semibold text-slate-700 mb-2">选择颜色标签</span>
+          <div id="period-color-picker" class="flex flex-wrap items-center gap-2"></div>
+          <input type="hidden" id="input-period-color" value="violet" />
+        </div>
+        <div>
+          <label for="input-period-note" class="block text-xs font-semibold text-slate-700 mb-1">阶段目标（可选）</label>
+          <input id="input-period-note" type="text" maxlength="50" placeholder="例如：完成3条样片并验证点击率" class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div class="flex items-center justify-between pt-2">
+          <button id="btn-delete-period" type="button" class="hidden px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl sm:rounded-lg transition-colors">删除此规划</button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button id="btn-cancel-add-period" type="button" class="px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl sm:rounded-lg transition-colors">取消</button>
+            <button type="submit" class="px-4 py-2.5 sm:py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl sm:rounded-lg transition-colors">保存规划</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-16 sm:top-auto sm:bottom-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-slate-900/95 text-white text-xs font-medium shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 whitespace-nowrap"></div>
+
+  <!-- Modal: Apple / iCloud Login & Cloud Backup -->
+  <div id="modal-icloud-backup" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-slate-900/45 backdrop-blur-xs p-0 sm:p-4">
+    <div class="mobile-sheet-enter bg-white rounded-t-3xl sm:rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-5 pb-7 sm:pb-5">
+      <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 sm:hidden"></div>
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.33c.64-.78 1.08-1.86.96-2.94-.93.04-2.06.62-2.72 1.4-.58.68-1.1 1.78-.96 2.84 1.04.08 2.08-.52 2.72-1.3z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">iCloud 账号与云盘备份</h2>
+            <p class="text-[11px] text-slate-500">本地实时运行 · 随时将日程备份至 iCloud</p>
+          </div>
+        </div>
+        <button id="btn-close-icloud-modal" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- View 1: Logged Out (Apple / iCloud Login) -->
+      <div id="icloud-logged-out-view" class="space-y-3.5">
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 leading-relaxed">
+          登录你的 <strong class="text-slate-900">Apple ID / iCloud 账号</strong> 后，可将本地的全部待办、习惯打卡、复盘、灵感和时期规划安全备份到你的 iCloud 空间，支持跨设备一键恢复。
+        </div>
+        <button id="btn-apple-quick-signin" type="button" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-colors">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.33c.64-.78 1.08-1.86.96-2.94-.93.04-2.06.62-2.72 1.4-.58.68-1.1 1.78-.96 2.84 1.04.08 2.08-.52 2.72-1.3z"/>
+          </svg>
+          <span>通过 Apple 账号快捷登录</span>
+        </button>
+        <div class="relative flex items-center py-0.5">
+          <div class="flex-grow border-t border-slate-200"></div>
+          <span class="flex-shrink mx-3 text-[11px] text-slate-400">或输入 iCloud 邮箱</span>
+          <div class="flex-grow border-t border-slate-200"></div>
+        </div>
+        <form id="form-icloud-email-login" class="space-y-2.5">
+          <input id="input-icloud-email" type="email" required placeholder="例如：yourname@icloud.com" class="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition-colors">
+            登录并绑定 iCloud 备份
+          </button>
+        </form>
+      </div>
+
+      <!-- View 2: Logged In (iCloud Backup Dashboard) -->
+      <div id="icloud-logged-in-view" class="hidden space-y-4">
+        <div class="p-3.5 rounded-2xl bg-sky-50/80 border border-sky-200 flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span id="icloud-account-display" class="text-xs font-bold text-slate-900 truncate">apple-user@icloud.com</span>
+            </div>
+            <p id="icloud-last-backup-text" class="text-[11px] text-slate-500 mt-0.5">尚未创建 iCloud 备份</p>
+          </div>
+          <button id="btn-icloud-logout" type="button" class="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-rose-600 bg-white border border-slate-200 rounded-lg transition-colors flex-shrink-0">
+            退出账号
+          </button>
+        </div>
+
+        <label class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200/80 cursor-pointer">
+          <div>
+            <div class="text-xs font-semibold text-slate-800">自动备份到 iCloud</div>
+            <div class="text-[11px] text-slate-500">每次修改日程时自动更新 iCloud 备份副本</div>
+          </div>
+          <input id="checkbox-icloud-autobackup" type="checkbox" class="w-4 h-4 accent-sky-600 rounded" />
+        </label>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <button id="btn-icloud-backup-now" type="button" class="py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <span>立即备份到 iCloud</span>
+          </button>
+          <button id="btn-icloud-restore-now" type="button" class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            <span>从 iCloud 恢复</span>
+          </button>
+        </div>
+
+        <button id="btn-icloud-save-file" type="button" class="w-full py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors">
+          <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span>下载 .axisday 备份文件（可存入手机「文件 → iCloud 云盘」）</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day Circle Context Menu -->
+  <div id="day-context-menu" class="fixed z-50 hidden w-52 bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-xl py-1.5 text-xs font-medium text-slate-700">
+    <div id="ctx-menu-header" class="px-3 py-1.5 text-[11px] font-bold text-slate-400 border-b border-slate-100">2026-11-19</div>
+    <button type="button" data-ctx-type="plans" class="w-full px-3 py-2 text-left hover:bg-rose-50 text-rose-700 flex items-center gap-2 transition-colors">
+      <span class="w-2 h-2 rounded-full bg-rose-500"></span>添加时间段待办
+    </button>
+    <button type="button" data-ctx-type="checkins" class="w-full px-3 py-2 text-left hover:bg-blue-50 text-blue-700 flex items-center gap-2 transition-colors">
+      <span class="w-2 h-2 rounded-full bg-blue-500"></span>添加习惯打卡
+    </button>
+    <button type="button" data-ctx-type="reviews" class="w-full px-3 py-2 text-left hover:bg-emerald-50 text-emerald-700 flex items-center gap-2 transition-colors">
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span>添加复盘与认知
+    </button>
+    <button type="button" data-ctx-type="inspirations" class="w-full px-3 py-2 text-left hover:bg-amber-50 text-amber-700 flex items-center gap-2 transition-colors">
+      <span class="w-2 h-2 rounded-full bg-amber-500"></span>添加变现/创意灵感
+    </button>
+  </div>
+
+  <!-- Modal: Add New Day -->
+  <div id="modal-add-day" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-xs p-0 sm:p-4">
+    <div class="mobile-sheet-enter bg-white rounded-t-3xl sm:rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm p-5 pb-7 sm:pb-5">
+      <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 sm:hidden"></div>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-bold text-slate-900">在箭头轴上新增一天</h2>
+        <button id="btn-close-add-day" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <form id="form-add-day" class="space-y-4">
+        <div>
+          <label for="input-new-date" class="block text-xs font-semibold text-slate-700 mb-1.5">选择日期</label>
+          <input id="input-new-date" type="date" required class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div>
+          <label for="input-new-day-label" class="block text-xs font-semibold text-slate-700 mb-1.5">主题标记（可选）</label>
+          <input id="input-new-day-label" type="text" maxlength="20" placeholder="例如：冲刺日 / 复盘日" class="w-full px-3 py-2.5 sm:py-2 text-sm border border-slate-300 rounded-xl sm:rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button id="btn-cancel-add-day" type="button" class="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl sm:rounded-lg transition-colors">取消</button>
+          <button type="submit" class="flex-1 sm:flex-none px-4 py-2.5 sm:py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl sm:rounded-lg transition-colors">添加到箭头轴</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = 'axisday_schedule_v1';
+      const TODAY_STR = '2026-11-19';
+      const isMobileScreen = () => window.innerWidth < 640;
+      const getColWidth = () => (isMobileScreen() ? 276 : 300);
+      const getColGap = () => (isMobileScreen() ? 22 : 36);
+
+      const INITIAL_DATA = [
+        {
+          date: '2026-11-17',
+          label: '选题启动',
+          pressed: false,
+          plans: [
+            { id: 'p1', start: '09:30', end: '11:00', text: '拆解3个高完播率AI工作流案例', done: true },
+            { id: 'p2', start: '14:00', end: '16:30', text: '剪辑第一版样片并导出测试', done: true }
+          ],
+          checkins: [
+            { id: 'c1', tag: '阅读', text: '深度阅读30分钟并输出3条卡片笔记', done: true },
+            { id: 'c2', tag: '运动', text: '有氧快走或拉伸20分钟', done: true }
+          ],
+          reviews: [
+            { id: 'r1', tag: '复盘', text: '前3秒钩子太长，下次直接上前后对比画面，留存率会高很多。' },
+            { id: 'r2', tag: '认知收获', text: '用户不为“技术参数”买单，只为“省下多少时间”买单。' }
+          ],
+          inspirations: [
+            { id: 'i1', tag: '变现灵感', text: '把剪辑常用的提示词和工作流打包成“懒人模板包”，配合教程做9.9元引流款。' }
+          ]
+        },
+        {
+          date: '2026-11-18',
+          label: '深度制作',
+          pressed: false,
+          plans: [
+            { id: 'p3', start: '09:00', end: '10:30', text: '撰写短视频脚本A/B两版开头', done: true },
+            { id: 'p4', start: '11:00', end: '12:00', text: '整理客户反馈与修改清单', done: true },
+            { id: 'p5', start: '15:00', end: '17:30', text: '完成主视频配音与音效铺底', done: false }
+          ],
+          checkins: [
+            { id: 'c3', tag: '阅读', text: '深度阅读30分钟', done: true },
+            { id: 'c4', tag: '日更', text: '发布一条灵感或产品进度动态', done: false }
+          ],
+          reviews: [
+            { id: 'r3', tag: '反思', text: '下午被零碎消息打断太多次，以后15:00-17:00必须开勿扰模式专心剪辑。' }
+          ],
+          inspirations: [
+            { id: 'i2', tag: '变现灵感', text: '针对独立咖啡店主做一套“30秒手机出片模板”，客单价可定在199元/月订阅。' },
+            { id: 'i3', tag: '内容创意', text: '拍一期“用100元成本做出万元广告质感”的幕后实拍对比。' }
+          ]
+        },
+        {
+          date: '2026-11-19',
+          label: '今日聚焦',
+          pressed: true,
+          plans: [
+            { id: 'p6', start: '09:00', end: '10:30', text: '完成主片调色与字幕精修', done: true },
+            { id: 'p7', start: '14:00', end: '15:30', text: '录制产品演示画面并对齐节奏', done: false },
+            { id: 'p8', start: '19:30', end: '20:30', text: '复盘本周数据并规划明日发布', done: false }
+          ],
+          checkins: [
+            { id: 'c5', tag: '阅读', text: '深度阅读30分钟', done: true },
+            { id: 'c6', tag: '运动', text: '核心力量训练20分钟', done: false },
+            { id: 'c7', tag: '复盘', text: '睡前10分钟清空待办与明日优先级', done: false }
+          ],
+          reviews: [
+            { id: 'r4', tag: '认知收获', text: '把每天的“计划”和“灵感”分开看之后，执行时不会分心，按下按钮再复盘效率极高。' }
+          ],
+          inspirations: [
+            { id: 'i4', tag: '变现灵感', text: '做垂直领域的AI工具测评合集页，挂载联盟分佣+付费社群答疑。' }
+          ]
+        },
+        {
+          date: '2026-11-20',
+          label: '发布与测试',
+          pressed: false,
+          plans: [
+            { id: 'p9', start: '10:00', end: '11:30', text: '多平台定时发布并监控首小时评论', done: false },
+            { id: 'p10', start: '16:00', end: '17:00', text: '整理评论区高频痛点作为下期选题', done: false }
+          ],
+          checkins: [
+            { id: 'c8', tag: '阅读', text: '深度阅读30分钟', done: false }
+          ],
+          reviews: [
+            { id: 'r5', tag: '复盘', text: '预留复盘坑位：记录首波自然流量转化率。' }
+          ],
+          inspirations: [
+            { id: 'i5', tag: '变现灵感', text: '评论区置顶引导领取“免费SOP清单”，测试私域加微转化率。' }
+          ]
+        },
+        {
+          date: '2026-11-21',
+          label: '周度沉淀',
+          pressed: false,
+          plans: [
+            { id: 'p11', start: '10:00', end: '12:00', text: '整理本周所有素材库与工程文件', done: false },
+            { id: 'p12', start: '15:00', end: '16:00', text: '下周排期表初稿与时间块分配', done: false }
+          ],
+          checkins: [],
+          reviews: [],
+          inspirations: [
+            { id: 'i6', tag: '产品创意', text: '把箭头轴向日程做成桌面端小组件，随时按一下记录闪念。' }
+          ]
+        }
+      ];
+
+      const PERIOD_COLORS = {
+        violet:  { name: '紫罗兰', bg: '#F5F3FF', border: '#C4B5FD', text: '#5B21B6', dot: '#8B5CF6' },
+        rose:    { name: '玫红',   bg: '#FFF1F2', border: '#FDA4AF', text: '#9F1239', dot: '#F43F5E' },
+        cyan:    { name: '天青',   bg: '#ECFEFF', border: '#67E8F9', text: '#155E75', dot: '#06B6D4' },
+        indigo:  { name: '靛蓝',   bg: '#EEF2FF', border: '#A5B4FC', text: '#3730A3', dot: '#6366F1' },
+        amber:   { name: '琥珀',   bg: '#FFFBEB', border: '#FCD34D', text: '#92400E', dot: '#F59E0B' },
+        emerald: { name: '翠绿',   bg: '#ECFDF5', border: '#6EE7B7', text: '#065F46', dot: '#10B981' }
+      };
+
+      const INITIAL_PERIODS = [
+        {
+          id: 'per1',
+          title: '第一阶段：内容打磨与样片测试',
+          startDate: '2026-11-17',
+          endDate: '2026-11-19',
+          colorKey: 'violet',
+          note: '聚焦脚本开头与剪辑节奏'
+        },
+        {
+          id: 'per2',
+          title: '第二阶段：发布引流与变现验证',
+          startDate: '2026-11-20',
+          endDate: '2026-11-21',
+          colorKey: 'rose',
+          note: '测试私域SOP清单转化'
+        }
+      ];
+
+      let state = {
+        days: [],
+        periods: [],
+        layout: 'horizontal',
+        calYear: 2026,
+        calMonth: 11,
+        calExpanded: false
+      };
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed.days) && parsed.days.length > 0) {
+              state.days = parsed.days.map(d => ({
+                ...d,
+                plans: Array.isArray(d.plans) ? d.plans : [],
+                checkins: Array.isArray(d.checkins) ? d.checkins : [],
+                reviews: Array.isArray(d.reviews) ? d.reviews : [],
+                inspirations: Array.isArray(d.inspirations) ? d.inspirations : []
+              }));
+              state.periods = Array.isArray(parsed.periods) ? parsed.periods : JSON.parse(JSON.stringify(INITIAL_PERIODS));
+              state.layout = parsed.layout === 'vertical' ? 'vertical' : 'horizontal';
+              return;
+            }
+          }
+        } catch (e) {}
+        state.days = JSON.parse(JSON.stringify(INITIAL_DATA));
+        state.periods = JSON.parse(JSON.stringify(INITIAL_PERIODS));
+        state.layout = 'horizontal';
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            days: state.days,
+            periods: state.periods,
+            layout: state.layout
+          }));
+          if (typeof autoBackupToICloud === 'function') {
+            autoBackupToICloud();
+          }
+        } catch (e) {}
+      }
+
+      function showToast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.remove('opacity-0');
+        el.classList.add('opacity-100');
+        clearTimeout(showToast._timer);
+        showToast._timer = setTimeout(() => {
+          el.classList.remove('opacity-100');
+          el.classList.add('opacity-0');
+        }, 2000);
+      }
+
+      function formatDateParts(dateStr) {
+        const parts = dateStr.split('-');
+        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+        return {
+          month: parts[1],
+          day: parts[2],
+          weekday: weekdays[d.getDay()],
+          isToday: dateStr === TODAY_STR
+        };
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function sortPlans(plans) {
+        return [...plans].sort((a, b) => a.start.localeCompare(b.start));
+      }
+
+      function dayHasContent(day) {
+        if (!day) return false;
+        const planLen = Array.isArray(day.plans) ? day.plans.length : 0;
+        const checkinLen = Array.isArray(day.checkins) ? day.checkins.length : 0;
+        const reviewLen = Array.isArray(day.reviews) ? day.reviews.length : 0;
+        const inspLen = Array.isArray(day.inspirations) ? day.inspirations.length : 0;
+        return (planLen + checkinLen + reviewLen + inspLen) > 0;
+      }
+
+      function renderCalendarView() {
+        const section = document.getElementById('calendar-overview-section');
+        const headerBtn = document.getElementById('btn-header-calendar');
+        const titleEl = document.getElementById('cal-month-title');
+        const gridEl = document.getElementById('calendar-days-grid');
+        const countEl = document.getElementById('cal-active-count');
+        if (!gridEl) return;
+
+        if (titleEl) {
+          titleEl.textContent = `${state.calYear}年 ${state.calMonth}月`;
+        }
+
+        if (section) {
+          if (state.calExpanded) {
+            section.classList.remove('hidden');
+          } else {
+            section.classList.add('hidden');
+          }
+        }
+
+        if (headerBtn) {
+          if (state.calExpanded) {
+            headerBtn.classList.remove('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700');
+            headerBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'text-white');
+          } else {
+            headerBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'text-white');
+            headerBtn.classList.add('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700');
+          }
+        }
+
+        const dayMap = new Map();
+        state.days.forEach(d => dayMap.set(d.date, d));
+
+        const year = state.calYear;
+        const month = state.calMonth;
+        const firstDayDate = new Date(year, month - 1, 1);
+        const startOffset = (firstDayDate.getDay() + 6) % 7;
+        const daysInMonth = new Date(year, month, 0).getDate();
+
+        let writtenInMonth = 0;
+        const cells = [];
+
+        for (let i = 0; i < startOffset; i++) {
+          cells.push(`<div class="h-5 rounded"></div>`);
+        }
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const dayObj = dayMap.get(dateStr);
+          const hasContent = dayHasContent(dayObj);
+          const isToday = dateStr === TODAY_STR;
+
+          if (hasContent) writtenInMonth++;
+
+          const cellStyle = hasContent
+            ? 'bg-emerald-500 text-white hover:bg-emerald-600 font-bold'
+            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 font-medium';
+
+          const todayRing = isToday ? 'ring-1.5 ring-slate-900' : '';
+
+          cells.push(`
+            <button type="button"
+              data-cal-date="${dateStr}"
+              class="h-5 rounded text-[10px] leading-none flex items-center justify-center transition-all cursor-pointer relative ${cellStyle} ${todayRing}"
+              title="${dateStr}${hasContent ? ' · 已写内容（点击定位）' : (dayObj ? ' · 已建日但未写内容' : ' · 未写内容（点击新建并定位）')}">
+              <span>${d}</span>
+            </button>
+          `);
+        }
+
+        gridEl.innerHTML = cells.join('');
+        if (countEl) {
+          countEl.textContent = `已写 ${writtenInMonth} 天`;
+        }
+      }
+
+      function renderPlanBlock(day, compact) {
+        if (day.plans.length === 0) return '';
+        const sorted = sortPlans(day.plans);
+        const doneCount = sorted.filter(p => p.done).length;
+        const allDone = doneCount === sorted.length;
+        if (compact && allDone) return '';
+        const headerBadge = `<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">${doneCount}/${sorted.length}</span>`;
+
+        const itemsHtml = sorted.map(p => `
+          <div class="group flex items-start gap-2 px-2.5 py-2 sm:px-2 sm:py-1.5 rounded-xl bg-white/95 border border-rose-100 hover:border-rose-300 transition-colors">
+            <button type="button" data-action="toggle-plan" data-date="${day.date}" data-id="${p.id}"
+              class="mt-0.5 w-4 h-4 sm:w-3.5 sm:h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${p.done ? 'bg-rose-600 border-rose-600 text-white' : 'border-rose-300 hover:border-rose-500 bg-white'}"
+              aria-label="切换完成状态">
+              ${p.done ? '<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+            </button>
+            <span class="mt-0.5 flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] leading-none font-mono font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">
+              ${escapeHtml(p.start)}-${escapeHtml(p.end)}
+            </span>
+            <p class="flex-1 min-w-0 text-xs leading-snug break-words ${p.done ? 'line-through text-slate-400' : 'text-slate-700 font-medium'}">${escapeHtml(p.text)}</p>
+            <button type="button" data-action="delete-item" data-type="plans" data-date="${day.date}" data-id="${p.id}"
+              class="mt-0.5 opacity-60 sm:opacity-0 group-hover:opacity-100 flex-shrink-0 text-slate-300 hover:text-rose-500 p-0.5 transition-opacity" title="删除">
+              <svg class="w-3.5 h-3.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        `).join('');
+
+        const hasHiddenDetails = compact && (day.reviews.length > 0 || day.inspirations.length > 0);
+
+        return `
+          <section class="rounded-2xl bg-rose-50/85 border border-rose-200/90 p-3 shadow-xs">
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                <span class="text-xs font-bold text-rose-900">待办</span>
+                ${headerBadge}
+              </div>
+              <button type="button" data-action="open-add-item" data-type="plans" data-date="${day.date}"
+                class="text-[11px] font-semibold text-rose-700 hover:text-rose-900 bg-white/80 hover:bg-white px-2 py-0.5 rounded-md border border-rose-200 transition-colors">
+                + 待办
+              </button>
+            </div>
+            <div class="space-y-2">
+              ${itemsHtml}
+            </div>
+            ${hasHiddenDetails ? `<div class="mt-2.5 pt-2 border-t border-rose-200/60 flex items-center justify-between text-[11px] text-rose-600/80">
+              <span>已隐藏复盘(${day.reviews.length})与灵感(${day.inspirations.length})</span>
+              <button type="button" data-action="toggle-day" data-date="${day.date}" class="font-semibold underline underline-offset-2 hover:text-rose-800">按下展开全天</button>
+            </div>` : ''}
+          </section>
+        `;
+      }
+
+      function renderCheckinBlock(day, compact) {
+        const list = day.checkins || [];
+        if (list.length === 0) return '';
+        const doneCount = list.filter(c => c.done).length;
+        const allDone = doneCount === list.length;
+        if (compact && allDone) return '';
+        const headerBadge = `<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">${doneCount}/${list.length}</span>`;
+
+        const itemsHtml = list.map(c => `
+          <div class="group flex items-start gap-2 px-2.5 py-2 sm:px-2 sm:py-1.5 rounded-xl bg-white/95 border border-blue-100 hover:border-blue-300 transition-colors">
+            <button type="button" data-action="toggle-checkin" data-date="${day.date}" data-id="${c.id}"
+              class="mt-0.5 w-4 h-4 sm:w-3.5 sm:h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${c.done ? 'bg-blue-600 border-blue-600 text-white' : 'border-blue-300 hover:border-blue-500 bg-white'}"
+              aria-label="切换打卡状态">
+              ${c.done ? '<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+            </button>
+            <span class="mt-0.5 flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] leading-none font-semibold bg-blue-50 text-blue-700 border border-blue-200/70">
+              ${escapeHtml(c.tag || '打卡')}
+            </span>
+            <p class="flex-1 min-w-0 text-xs leading-snug break-words ${c.done ? 'line-through text-slate-400' : 'text-slate-700 font-medium'}">${escapeHtml(c.text)}</p>
+            <button type="button" data-action="delete-item" data-type="checkins" data-date="${day.date}" data-id="${c.id}"
+              class="mt-0.5 opacity-60 sm:opacity-0 group-hover:opacity-100 flex-shrink-0 text-slate-300 hover:text-rose-500 p-0.5 transition-opacity" title="删除">
+              <svg class="w-3.5 h-3.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        `).join('');
+
+        return `
+          <section class="rounded-2xl bg-blue-50/85 border border-blue-200/90 p-3 shadow-xs">
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                <span class="text-xs font-bold text-blue-900">打卡 · 进度追踪</span>
+                ${headerBadge}
+              </div>
+              <button type="button" data-action="open-add-item" data-type="checkins" data-date="${day.date}"
+                class="text-[11px] font-semibold text-blue-700 hover:text-blue-900 bg-white/80 hover:bg-white px-2 py-0.5 rounded-md border border-blue-200 transition-colors">
+                + 打卡
+              </button>
+            </div>
+            <div class="space-y-2">
+              ${itemsHtml}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderReviewBlock(day) {
+        if (day.reviews.length === 0) return '';
+        const itemsHtml = day.reviews.map(r => `
+          <div class="group flex items-start gap-2 p-2.5 rounded-xl bg-white/90 border border-emerald-100 hover:border-emerald-300 transition-colors">
+            <div class="flex-1 min-w-0">
+              <span class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 mb-1">${escapeHtml(r.tag)}</span>
+              <p class="text-xs leading-relaxed break-words text-slate-700">${escapeHtml(r.text)}</p>
+            </div>
+            <button type="button" data-action="delete-item" data-type="reviews" data-date="${day.date}" data-id="${r.id}"
+              class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 p-0.5 transition-opacity" title="删除">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        `).join('');
+
+        return `
+          <section class="block-animate rounded-2xl bg-emerald-50/85 border border-emerald-200/90 p-3 shadow-xs">
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span class="text-xs font-bold text-emerald-900">回顾 · 复盘与认知</span>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">${day.reviews.length}</span>
+              </div>
+              <button type="button" data-action="open-add-item" data-type="reviews" data-date="${day.date}"
+                class="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-white/80 hover:bg-white px-2 py-0.5 rounded-md border border-emerald-200 transition-colors">
+                + 复盘
+              </button>
+            </div>
+            <div class="space-y-2">${itemsHtml}</div>
+          </section>
+        `;
+      }
+
+      function renderInspirationBlock(day) {
+        if (day.inspirations.length === 0) return '';
+        const itemsHtml = day.inspirations.map(i => `
+          <div class="group flex items-start gap-2 p-2.5 rounded-xl bg-white/90 border border-amber-100 hover:border-amber-300 transition-colors">
+            <div class="flex-1 min-w-0">
+              <span class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 mb-1">${escapeHtml(i.tag)}</span>
+              <p class="text-xs leading-relaxed break-words text-slate-700">${escapeHtml(i.text)}</p>
+            </div>
+            <button type="button" data-action="delete-item" data-type="inspirations" data-date="${day.date}" data-id="${i.id}"
+              class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 p-0.5 transition-opacity" title="删除">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        `).join('');
+
+        return `
+          <section class="block-animate rounded-2xl bg-amber-50/85 border border-amber-200/90 p-3 shadow-xs">
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                <span class="text-xs font-bold text-amber-900">灵感 · 变现与创意</span>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">${day.inspirations.length}</span>
+              </div>
+              <button type="button" data-action="open-add-item" data-type="inspirations" data-date="${day.date}"
+                class="text-[11px] font-semibold text-amber-700 hover:text-amber-900 bg-white/80 hover:bg-white px-2 py-0.5 rounded-md border border-amber-200 transition-colors">
+                + 灵感
+              </button>
+            </div>
+            <div class="space-y-2">${itemsHtml}</div>
+          </section>
+        `;
+      }
+
+      function renderDayCircleButton(day) {
+        const info = formatDateParts(day.date);
+        const isPressed = day.pressed;
+        const btnClasses = isPressed
+          ? 'is-pressed bg-emerald-600 text-white border-emerald-700'
+          : (info.isToday
+              ? 'bg-white text-slate-900 border-slate-900 ring-4 ring-slate-900/10'
+              : 'bg-white text-slate-800 border-slate-300 hover:border-slate-500');
+
+        return `
+          <div class="flex flex-col items-center relative z-10">
+            <button type="button"
+              data-action="toggle-day"
+              data-date="${day.date}"
+              id="day-btn-${day.date}"
+              class="day-circle-btn w-20 h-20 rounded-full border-2 flex flex-col items-center justify-center cursor-pointer select-none shadow-md ${btnClasses}"
+              aria-pressed="${isPressed}"
+              title="左键点击展开/收起 · 右键添加计划/打卡/复盘/灵感">
+              <span class="text-[10px] font-semibold uppercase tracking-wider ${isPressed ? 'text-emerald-100' : 'text-slate-400'}">${info.month}月 · ${info.weekday}</span>
+              <span class="text-2xl font-bold leading-none my-0.5">${info.day}</span>
+              <div class="flex items-center gap-1 mt-1">
+                <span class="w-1.5 h-1.5 rounded-full ${day.plans.length ? 'bg-rose-400' : 'bg-slate-300/60'}" title="待办"></span>
+                <span class="w-1.5 h-1.5 rounded-full ${(day.checkins && day.checkins.length) ? 'bg-blue-400' : 'bg-slate-300/60'}" title="打卡"></span>
+                <span class="w-1.5 h-1.5 rounded-full ${day.reviews.length ? (isPressed ? 'bg-emerald-200' : 'bg-emerald-400') : 'bg-slate-300/60'}" title="复盘"></span>
+                <span class="w-1.5 h-1.5 rounded-full ${day.inspirations.length ? 'bg-amber-400' : 'bg-slate-300/60'}" title="灵感"></span>
+              </div>
+            </button>
+
+            <div class="mt-2 flex items-center gap-1.5">
+              ${info.isToday ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-900 text-white">今天</span>` : ''}
+              ${day.label ? `<span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-white/90 border border-slate-200 text-slate-600">${escapeHtml(day.label)}</span>` : ''}
+              <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ${isPressed ? 'bg-emerald-600 text-white' : 'bg-slate-200/70 text-slate-600'}">
+                ${isPressed ? '已按下 · 全天' : '未按 · 仅计划'}
+              </span>
+            </div>
+          </div>
+        `;
+      }
+
+      function computePeriodLanes(sortedDays) {
+        const dateList = sortedDays.map(d => d.date);
+        const spans = [];
+        state.periods.forEach(p => {
+          let startIdx = -1;
+          let endIdx = -1;
+          dateList.forEach((dt, idx) => {
+            if (dt >= p.startDate && dt <= p.endDate) {
+              if (startIdx === -1) startIdx = idx;
+              endIdx = idx;
+            }
+          });
+          if (startIdx !== -1 && endIdx !== -1) {
+            spans.push({ period: p, startIdx, endIdx, lane: 0 });
+          }
+        });
+
+        spans.sort((a, b) => a.startIdx - b.startIdx || (b.endIdx - b.startIdx) - (a.endIdx - a.startIdx));
+        const laneEnds = [];
+        spans.forEach(item => {
+          let assigned = -1;
+          for (let l = 0; l < laneEnds.length; l++) {
+            if (laneEnds[l] < item.startIdx) {
+              assigned = l;
+              laneEnds[l] = item.endIdx;
+              break;
+            }
+          }
+          if (assigned === -1) {
+            assigned = laneEnds.length;
+            laneEnds.push(item.endIdx);
+          }
+          item.lane = assigned;
+        });
+
+        return { spans, laneCount: Math.max(1, laneEnds.length) };
+      }
+
+      function renderPeriodTracks(sortedDays) {
+        const { spans, laneCount } = computePeriodLanes(sortedDays);
+        const barThickness = laneCount === 1 ? 20 : laneCount === 2 ? 15 : laneCount === 3 ? 12 : 10;
+        const laneGap = 2;
+        const fontSize = laneCount === 1 ? 11 : laneCount === 2 ? 10 : 9;
+
+        if (state.layout === 'horizontal') {
+          const track = document.getElementById('period-track-horizontal');
+          const rowEl = document.getElementById('arrow-row-horizontal');
+          if (!track || !rowEl) return;
+
+          const colW = getColWidth();
+          const colGap = getColGap();
+          const padLeft = isMobileScreen() ? 16 : 32;
+          const centersX = sortedDays.map((_, idx) => padLeft + idx * (colW + colGap) + colW / 2);
+
+          const totalTrackHeight = laneCount * barThickness + Math.max(0, laneCount - 1) * laneGap;
+          const startTop = Math.round(40 - totalTrackHeight / 2);
+          const circleHalfW = 40;
+
+          track.innerHTML = spans.map(item => {
+            const p = item.period;
+            const c = PERIOD_COLORS[p.colorKey] || PERIOD_COLORS.violet;
+            const x1 = centersX[item.startIdx];
+            const x2 = centersX[item.endIdx];
+            const left = Math.min(x1, x2);
+            const width = Math.max(24, Math.abs(x2 - x1));
+            const top = startTop + item.lane * (barThickness + laneGap);
+
+            let gapLabelsHtml = '';
+            if (item.endIdx > item.startIdx) {
+              let bestGapLeft = 0;
+              let bestGapWidth = 0;
+              for (let idx = item.startIdx; idx < item.endIdx; idx++) {
+                const gLeft = centersX[idx] + circleHalfW - left;
+                const gRight = centersX[idx + 1] - circleHalfW - left;
+                const gW = gRight - gLeft;
+                if (gW > bestGapWidth) {
+                  bestGapWidth = gW;
+                  bestGapLeft = gLeft;
+                }
+              }
+              if (bestGapWidth > 20) {
+                gapLabelsHtml = `
+                  <div style="left:${bestGapLeft}px; width:${bestGapWidth}px; font-size:${fontSize}px; line-height:${barThickness}px;"
+                    class="absolute inset-y-0 px-2 flex items-center justify-center text-white font-bold truncate pointer-events-none select-none drop-shadow-xs">
+                    ${escapeHtml(p.title)}
+                  </div>
+                `;
+              }
+            }
+
+            return `
+              <div data-action="edit-period" data-id="${p.id}"
+                style="left:${left}px; width:${width}px; top:${top}px; height:${barThickness}px; background:${c.dot};"
+                class="absolute rounded-full pointer-events-auto cursor-pointer opacity-95 hover:opacity-100 shadow-xs transition-opacity"
+                title="${escapeHtml(p.title)} (${p.startDate} ~ ${p.endDate})">
+                ${gapLabelsHtml}
+              </div>
+            `;
+          }).join('');
+        } else {
+          const track = document.getElementById('period-track-vertical');
+          const colContainer = document.getElementById('arrow-col-vertical');
+          if (!track || !colContainer) return;
+
+          const colRect = colContainer.getBoundingClientRect();
+          const centersY = sortedDays.map(d => {
+            const btn = document.getElementById(`day-btn-${d.date}`);
+            if (!btn) return 40;
+            const r = btn.getBoundingClientRect();
+            return (r.top - colRect.top) + r.height / 2;
+          });
+
+          const totalTrackWidth = laneCount * barThickness + Math.max(0, laneCount - 1) * laneGap;
+          const axisCenterX = window.innerWidth < 640 ? 52 : 60;
+          const startLeft = Math.round(axisCenterX - totalTrackWidth / 2);
+
+          track.innerHTML = spans.map(item => {
+            const p = item.period;
+            const c = PERIOD_COLORS[p.colorKey] || PERIOD_COLORS.violet;
+            const y1 = centersY[item.startIdx];
+            const y2 = centersY[item.endIdx];
+            const top = Math.min(y1, y2);
+            const height = Math.max(16, Math.abs(y2 - y1));
+            const left = startLeft + item.lane * (barThickness + laneGap);
+
+            return `
+              <div data-action="edit-period" data-id="${p.id}"
+                style="top:${top}px; height:${height}px; left:${left}px; width:${barThickness}px; background:${c.dot};"
+                class="absolute rounded-full pointer-events-auto cursor-pointer opacity-95 hover:opacity-100 transition-opacity"
+                title="${escapeHtml(p.title)} (${p.startDate} ~ ${p.endDate})">
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      function render() {
+        const viewport = document.getElementById('axis-viewport');
+        const prevScrollLeft = viewport ? viewport.scrollLeft : 0;
+        const prevScrollTop = viewport ? viewport.scrollTop : 0;
+
+        const sortedDays = [...state.days].sort((a, b) => a.date.localeCompare(b.date));
+        const allPressed = sortedDays.length > 0 && sortedDays.every(d => d.pressed);
+        document.getElementById('btn-toggle-all').textContent = allPressed ? '全部收起' : '全部按下';
+        document.getElementById('layout-label').textContent = state.layout === 'horizontal' ? '横向轴' : '纵向轴';
+
+        if (state.layout === 'horizontal') {
+          const colW = getColWidth();
+          const colGap = getColGap();
+          const padClass = isMobileScreen() ? 'px-4' : 'px-8';
+
+          const topRowHtml = sortedDays.map(day => {
+            const planHtml = renderPlanBlock(day, !day.pressed);
+            const checkinHtml = renderCheckinBlock(day, !day.pressed);
+            const hasTopCards = Boolean(planHtml || checkinHtml);
+            return `
+              <div style="width:${colW}px;" class="flex-shrink-0 flex flex-col justify-end items-center">
+                <div class="w-full flex flex-col space-y-2.5 mb-2">
+                  ${checkinHtml}
+                  ${planHtml}
+                </div>
+                <div class="w-0.5 h-4 ${hasTopCards ? 'bg-blue-400' : 'bg-transparent'} mb-1"></div>
+              </div>
+            `;
+          }).join('');
+
+          const circleRowHtml = sortedDays.map(day => {
+            return `
+              <div style="width:${colW}px;" class="flex-shrink-0 flex justify-center relative z-10">
+                ${renderDayCircleButton(day)}
+              </div>
+            `;
+          }).join('');
+
+          const bottomRowHtml = sortedDays.map(day => {
+            const reviewHtml = day.pressed ? renderReviewBlock(day) : '';
+            const inspHtml = day.pressed ? renderInspirationBlock(day) : '';
+            const hasBottomBlocks = Boolean(reviewHtml || inspHtml);
+            return `
+              <div style="width:${colW}px;" class="flex-shrink-0 flex flex-col items-center">
+                <div class="w-0.5 h-4 ${hasBottomBlocks ? 'bg-emerald-500' : 'bg-transparent'} mt-1 mb-2 transition-colors"></div>
+                <div class="w-full space-y-3">
+                  ${reviewHtml}
+                  ${inspHtml}
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          viewport.innerHTML = `
+            <div id="axis-zoom-wrapper" class="w-max min-w-full flex items-start justify-center">
+              <div id="axis-zoom-stage" style="zoom:0.85;" class="inline-block">
+                <div id="arrow-row-horizontal" class="flex flex-col ${padClass}">
+                  <div style="gap:${colGap}px;" class="flex items-end">
+                    ${topRowHtml}
+                    <div class="w-10 flex-shrink-0"></div>
+                  </div>
+                  <div style="gap:${colGap}px;" class="relative flex items-start">
+                    <div id="horizontal-axis-line" style="top:38px;" class="absolute left-0 right-4 h-1.5 bg-slate-300 rounded-full z-0"></div>
+                    <div id="period-track-horizontal" style="top:0px;" class="absolute inset-x-0 h-20 pointer-events-none z-[5]"></div>
+                    <div id="horizontal-axis-arrow" style="top:29px;" class="absolute right-0 z-0 text-slate-400">
+                      <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M13.293 5.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L17.586 13H4a1 1 0 110-2h13.586l-4.293-4.293a1 1 0 010-1.414z"/>
+                      </svg>
+                    </div>
+                    ${circleRowHtml}
+                    <div class="w-10 flex-shrink-0"></div>
+                  </div>
+                  <div style="gap:${colGap}px;" class="flex items-start">
+                    ${bottomRowHtml}
+                    <div class="w-10 flex-shrink-0"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        } else {
+          const rowsHtml = sortedDays.map(day => {
+            return `
+              <div data-day-row="${day.date}" class="relative flex items-start gap-4 sm:gap-8">
+                <div class="flex-shrink-0 pt-1">
+                  ${renderDayCircleButton(day)}
+                </div>
+                <div class="flex-1 min-w-0 grid gap-3 ${day.pressed ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 max-w-md'}">
+                  ${renderCheckinBlock(day, !day.pressed)}
+                  ${renderPlanBlock(day, !day.pressed)}
+                  ${day.pressed ? renderReviewBlock(day) : ''}
+                  ${day.pressed ? renderInspirationBlock(day) : ''}
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          viewport.innerHTML = `
+            <div id="axis-zoom-wrapper" class="max-w-7xl mx-auto">
+              <div id="axis-zoom-stage" class="w-full relative pl-2 sm:pl-4 pb-16">
+                <div id="arrow-col-vertical" class="relative">
+                  <div class="absolute left-[49px] sm:left-[57px] top-6 bottom-4 w-1.5 bg-slate-300 rounded-full z-0"></div>
+                  <div id="period-track-vertical" class="absolute inset-y-0 left-0 w-40 pointer-events-none z-[5]"></div>
+                  <div class="absolute left-[38px] sm:left-[46px] bottom-0 z-0 text-slate-400">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.707 13.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L11 17.586V4a1 1 0 112 0v13.586l4.293-4.293a1 1 0 011.414 0z"/>
+                    </svg>
+                  </div>
+                  <div class="space-y-8 sm:space-y-10">
+                    ${rowsHtml}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        renderPeriodTracks(sortedDays);
+        updateStats(sortedDays);
+        renderCalendarView();
+        alignHorizontalAxis(prevScrollLeft, prevScrollTop);
+      }
+
+      function alignHorizontalAxis(prevScrollLeft, prevScrollTop) {
+        if (state.layout !== 'horizontal') return;
+        const viewport = document.getElementById('axis-viewport');
+        const wrapper = document.getElementById('axis-zoom-wrapper');
+        if (!viewport || !wrapper) return;
+
+        wrapper.style.paddingTop = '24px';
+        wrapper.style.paddingBottom = '48px';
+
+        if (typeof prevScrollLeft === 'number') {
+          viewport.scrollLeft = prevScrollLeft;
+          viewport.scrollTop = prevScrollTop || 0;
+        }
+      }
+
+      function updateStats(days) {
+        const totalPlans = days.reduce((s, d) => s + d.plans.length, 0);
+        const donePlans = days.reduce((s, d) => s + d.plans.filter(p => p.done).length, 0);
+        const totalCheckins = days.reduce((s, d) => s + (d.checkins ? d.checkins.length : 0), 0);
+        const doneCheckins = days.reduce((s, d) => s + (d.checkins ? d.checkins.filter(c => c.done).length : 0), 0);
+        const totalReviews = days.reduce((s, d) => s + d.reviews.length, 0);
+        const totalInsps = days.reduce((s, d) => s + d.inspirations.length, 0);
+        const expandedCount = days.filter(d => d.pressed).length;
+
+        document.getElementById('stats-summary').innerHTML = `
+          <span>共 ${days.length} 天（${expandedCount} 天已按下展开）</span>
+          <span class="text-rose-600">待办 ${donePlans}/${totalPlans}</span>
+          <span class="text-blue-600">打卡 ${doneCheckins}/${totalCheckins}</span>
+          <span class="text-emerald-600">复盘 ${totalReviews}</span>
+          <span class="text-amber-600">灵感 ${totalInsps}</span>
+        `;
+      }
+
+      const ctxMenu = document.getElementById('day-context-menu');
+      let ctxTargetDate = null;
+
+      function openDayContextMenu(dateStr, x, y) {
+        ctxTargetDate = dateStr;
+        const info = formatDateParts(dateStr);
+        document.getElementById('ctx-menu-header').textContent = `${dateStr} · ${info.weekday}`;
+        ctxMenu.classList.remove('hidden');
+
+        const menuW = 208;
+        const menuH = 188;
+        const safeX = Math.min(Math.max(12, x), window.innerWidth - menuW - 12);
+        const safeY = Math.min(Math.max(12, y), window.innerHeight - menuH - 12);
+        ctxMenu.style.left = `${safeX}px`;
+        ctxMenu.style.top = `${safeY}px`;
+      }
+
+      function closeDayContextMenu() {
+        ctxMenu.classList.add('hidden');
+        ctxTargetDate = null;
+      }
+
+      document.getElementById('axis-viewport').addEventListener('contextmenu', function (e) {
+        const dayBtn = e.target.closest('[data-action="toggle-day"]');
+        if (!dayBtn) return;
+        e.preventDefault();
+        openDayContextMenu(dayBtn.dataset.date, e.clientX, e.clientY);
+      });
+
+      let longPressTimer = null;
+      document.getElementById('axis-viewport').addEventListener('touchstart', function (e) {
+        const dayBtn = e.target.closest('[data-action="toggle-day"]');
+        if (!dayBtn || e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        const dateStr = dayBtn.dataset.date;
+        clearTimeout(longPressTimer);
+        longPressTimer = setTimeout(() => {
+          openDayContextMenu(dateStr, touch.clientX, touch.clientY);
+        }, 480);
+      }, { passive: true });
+
+      document.getElementById('axis-viewport').addEventListener('touchmove', function () {
+        clearTimeout(longPressTimer);
+      }, { passive: true });
+
+      document.getElementById('axis-viewport').addEventListener('touchend', function () {
+        clearTimeout(longPressTimer);
+      }, { passive: true });
+
+      ctxMenu.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-ctx-type]');
+        if (!btn || !ctxTargetDate) return;
+        const targetDate = ctxTargetDate;
+        const targetType = btn.dataset.ctxType;
+        closeDayContextMenu();
+        openAddItemModal(targetDate, targetType);
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!ctxMenu.classList.contains('hidden') && !ctxMenu.contains(e.target)) {
+          closeDayContextMenu();
+        }
+      });
+
+      document.getElementById('axis-viewport').addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+        if (action === 'delete-period') {
+          e.stopPropagation();
+          state.periods = state.periods.filter(p => p.id !== btn.dataset.id);
+          saveState();
+          render();
+          showToast('已删除时期规划');
+          return;
+        }
+        if (action === 'edit-period') {
+          openPeriodModal(btn.dataset.id);
+          return;
+        }
+
+        const dateStr = btn.dataset.date;
+        const day = state.days.find(d => d.date === dateStr);
+        if (!day) return;
+
+        if (action === 'toggle-day') {
+          day.pressed = !day.pressed;
+          saveState();
+          render();
+          showToast(day.pressed ? `${dateStr} 已按下：展示全天分块` : `${dateStr} 已收起：仅显示计划`);
+        } else if (action === 'toggle-plan') {
+          const item = day.plans.find(p => p.id === btn.dataset.id);
+          if (item) {
+            item.done = !item.done;
+            saveState();
+            render();
+          }
+        } else if (action === 'toggle-checkin') {
+          const item = (day.checkins || []).find(c => c.id === btn.dataset.id);
+          if (item) {
+            item.done = !item.done;
+            saveState();
+            render();
+          }
+        } else if (action === 'delete-item') {
+          const type = btn.dataset.type;
+          const id = btn.dataset.id;
+          day[type] = (day[type] || []).filter(item => item.id !== id);
+          saveState();
+          render();
+          showToast('已删除记录');
+        } else if (action === 'open-add-item') {
+          openAddItemModal(dateStr, btn.dataset.type);
+        }
+      });
+
+      document.getElementById('btn-header-calendar').addEventListener('click', function () {
+        state.calExpanded = !state.calExpanded;
+        renderCalendarView();
+      });
+
+      document.getElementById('btn-toggle-calendar').addEventListener('click', function () {
+        state.calExpanded = false;
+        renderCalendarView();
+      });
+
+      document.getElementById('btn-cal-prev-month').addEventListener('click', function () {
+        state.calMonth -= 1;
+        if (state.calMonth < 1) {
+          state.calMonth = 12;
+          state.calYear -= 1;
+        }
+        renderCalendarView();
+      });
+
+      document.getElementById('btn-cal-next-month').addEventListener('click', function () {
+        state.calMonth += 1;
+        if (state.calMonth > 12) {
+          state.calMonth = 1;
+          state.calYear += 1;
+        }
+        renderCalendarView();
+      });
+
+      document.getElementById('calendar-days-grid').addEventListener('click', function (e) {
+        const cell = e.target.closest('[data-cal-date]');
+        if (!cell) return;
+        const targetDate = cell.dataset.calDate;
+        let existing = state.days.find(d => d.date === targetDate);
+        if (!existing) {
+          existing = {
+            date: targetDate,
+            label: '',
+            pressed: false,
+            plans: [],
+            checkins: [],
+            reviews: [],
+            inspirations: []
+          };
+          state.days.push(existing);
+          saveState();
+          render();
+          showToast(`已新建日期 ${targetDate}`);
+        }
+        state.calExpanded = false;
+        renderCalendarView();
+
+        requestAnimationFrame(() => {
+          const btnEl = document.getElementById(`day-btn-${targetDate}`);
+          if (btnEl) {
+            btnEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+          }
+        });
+      });
+
+      document.getElementById('btn-toggle-layout').addEventListener('click', function () {
+        state.layout = state.layout === 'horizontal' ? 'vertical' : 'horizontal';
+        saveState();
+        render();
+      });
+
+      document.getElementById('btn-toggle-all').addEventListener('click', function () {
+        const allPressed = state.days.every(d => d.pressed);
+        state.days.forEach(d => { d.pressed = !allPressed; });
+        saveState();
+        render();
+        showToast(!allPressed ? '已全部按下展开' : '已全部收起为仅看计划');
+      });
+
+      document.getElementById('btn-jump-today').addEventListener('click', function () {
+        const todayEl = document.getElementById(`day-btn-${TODAY_STR}`);
+        if (todayEl) {
+          todayEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+          showToast('已定位到今天');
+        } else {
+          showToast('轴上暂无今天日期，可点击右上角新增');
+        }
+      });
+
+      document.getElementById('btn-reset-demo').addEventListener('click', function () {
+        state.days = JSON.parse(JSON.stringify(INITIAL_DATA));
+        state.periods = JSON.parse(JSON.stringify(INITIAL_PERIODS));
+        saveState();
+        render();
+        showToast('已恢复示例日程数据');
+      });
+
+      document.getElementById('btn-export-backup').addEventListener('click', function () {
+        try {
+          const payload = {
+            app: 'AxisDay',
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            days: state.days,
+            periods: state.periods
+          };
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `AxisDay-备份-${TODAY_STR}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('已导出 JSON 备份文件');
+        } catch (err) {
+          showToast('导出失败，请重试');
+        }
+      });
+
+      const importFileInput = document.getElementById('input-import-file');
+      document.getElementById('btn-import-backup').addEventListener('click', function () {
+        importFileInput.value = '';
+        importFileInput.click();
+      });
+
+      importFileInput.addEventListener('change', function (e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (ev) {
+          try {
+            const parsed = JSON.parse(String(ev.target.result || '{}'));
+            if (!Array.isArray(parsed.days) || parsed.days.length === 0) {
+              showToast('备份文件格式不正确');
+              return;
+            }
+            state.days = parsed.days.map(d => ({
+              ...d,
+              plans: Array.isArray(d.plans) ? d.plans : [],
+              checkins: Array.isArray(d.checkins) ? d.checkins : [],
+              reviews: Array.isArray(d.reviews) ? d.reviews : [],
+              inspirations: Array.isArray(d.inspirations) ? d.inspirations : []
+            }));
+            state.periods = Array.isArray(parsed.periods) ? parsed.periods : [];
+            saveState();
+            render();
+            showToast(`已成功恢复 ${state.days.length} 天日程数据`);
+          } catch (err) {
+            showToast('解析备份文件失败');
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      const mobileCheckinBtn = document.getElementById('btn-mobile-add-checkin');
+      if (mobileCheckinBtn) {
+        mobileCheckinBtn.addEventListener('click', function () {
+          const sortedDays = [...state.days].sort((a, b) => a.date.localeCompare(b.date));
+          const target = sortedDays.find(d => d.date === TODAY_STR) ? TODAY_STR : (sortedDays[0] ? sortedDays[0].date : TODAY_STR);
+          openAddItemModal(target, 'checkins');
+        });
+      }
+      const mobilePeriodBtn = document.getElementById('btn-mobile-add-period');
+      if (mobilePeriodBtn) {
+        mobilePeriodBtn.addEventListener('click', function () {
+          openPeriodModal(null);
+        });
+      }
+      const mobileDayBtn = document.getElementById('btn-mobile-add-day');
+      if (mobileDayBtn) {
+        mobileDayBtn.addEventListener('click', function () {
+          openAddDayModal();
+        });
+      }
+
+      const modalAddDay = document.getElementById('modal-add-day');
+      function openAddDayModal() {
+        const sorted = [...state.days].sort((a, b) => a.date.localeCompare(b.date));
+        const lastDate = sorted.length ? sorted[sorted.length - 1].date : '2026-11-21';
+        const parts = lastDate.split('-');
+        const nextDt = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]) + 1);
+        const nextStr = `${nextDt.getFullYear()}-${String(nextDt.getMonth() + 1).padStart(2, '0')}-${String(nextDt.getDate()).padStart(2, '0')}`;
+        document.getElementById('input-new-date').value = nextStr;
+        document.getElementById('input-new-day-label').value = '';
+        modalAddDay.classList.remove('hidden');
+        modalAddDay.classList.add('flex');
+      }
+      function closeAddDayModal() {
+        modalAddDay.classList.add('hidden');
+        modalAddDay.classList.remove('flex');
+      }
+      document.getElementById('btn-open-add-day').addEventListener('click', openAddDayModal);
+      document.getElementById('btn-close-add-day').addEventListener('click', closeAddDayModal);
+      document.getElementById('btn-cancel-add-day').addEventListener('click', closeAddDayModal);
+
+      document.getElementById('form-add-day').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const dateVal = document.getElementById('input-new-date').value;
+        const labelVal = document.getElementById('input-new-day-label').value.trim();
+        if (!dateVal) return;
+
+        if (state.days.some(d => d.date === dateVal)) {
+          showToast('该日期已在箭头轴上');
+          closeAddDayModal();
+          return;
+        }
+
+        state.days.push({
+          date: dateVal,
+          label: labelVal,
+          pressed: false,
+          plans: [],
+          checkins: [],
+          reviews: [],
+          inspirations: []
+        });
+        saveState();
+        render();
+        closeAddDayModal();
+        showToast(`已将 ${dateVal} 添加到箭头轴`);
+      });
+
+      const modalAddItem = document.getElementById('modal-add-item');
+      function openAddItemModal(dateStr, type) {
+        const sortedDays = [...state.days].sort((a, b) => a.date.localeCompare(b.date));
+        const dateSelect = document.getElementById('select-item-date');
+        dateSelect.innerHTML = sortedDays.map(d => {
+          const info = formatDateParts(d.date);
+          return `<option value="${d.date}" ${d.date === dateStr ? 'selected' : ''}>${d.date} (${info.weekday}${d.label ? ' · ' + escapeHtml(d.label) : ''})</option>`;
+        }).join('');
+
+        document.getElementById('item-target-type').value = type;
+        document.getElementById('input-item-text').value = '';
+
+        const badge = document.getElementById('modal-item-badge');
+        const title = document.getElementById('modal-item-title');
+        const timeField = document.getElementById('field-time-slot');
+        const subtagField = document.getElementById('field-subtag');
+        const subtagSelect = document.getElementById('input-subtag');
+
+        if (type === 'plans') {
+          badge.className = 'w-3 h-3 rounded-full bg-rose-500';
+          title.textContent = '添加时间段计划';
+          timeField.classList.remove('hidden');
+          subtagField.classList.add('hidden');
+        } else if (type === 'checkins') {
+          badge.className = 'w-3 h-3 rounded-full bg-blue-500';
+          title.textContent = '添加打卡事项';
+          timeField.classList.add('hidden');
+          subtagField.classList.remove('hidden');
+          subtagSelect.innerHTML = `
+            <option value="阅读">阅读</option>
+            <option value="运动">运动</option>
+            <option value="日更">日更</option>
+            <option value="复盘">复盘</option>
+            <option value="习惯">习惯</option>
+          `;
+        } else if (type === 'reviews') {
+          badge.className = 'w-3 h-3 rounded-full bg-emerald-500';
+          title.textContent = '添加复盘 / 认知收获';
+          timeField.classList.add('hidden');
+          subtagField.classList.remove('hidden');
+          subtagSelect.innerHTML = `
+            <option value="复盘">复盘</option>
+            <option value="认知收获">认知收获</option>
+            <option value="反思">反思</option>
+          `;
+        } else {
+          badge.className = 'w-3 h-3 rounded-full bg-amber-500';
+          title.textContent = '捕捉变现 / 创意灵感';
+          timeField.classList.add('hidden');
+          subtagField.classList.remove('hidden');
+          subtagSelect.innerHTML = `
+            <option value="变现灵感">变现灵感</option>
+            <option value="产品创意">产品创意</option>
+            <option value="内容创意">内容创意</option>
+            <option value="随手记">随手记</option>
+          `;
+        }
+
+        modalAddItem.classList.remove('hidden');
+        modalAddItem.classList.add('flex');
+        document.getElementById('input-item-text').focus();
+      }
+
+      function closeAddItemModal() {
+        modalAddItem.classList.add('hidden');
+        modalAddItem.classList.remove('flex');
+      }
+      document.getElementById('btn-close-add-item').addEventListener('click', closeAddItemModal);
+      document.getElementById('btn-cancel-add-item').addEventListener('click', closeAddItemModal);
+
+      document.getElementById('form-add-item').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const dateStr = document.getElementById('select-item-date').value;
+        const type = document.getElementById('item-target-type').value;
+        const text = document.getElementById('input-item-text').value.trim();
+        if (!text) return;
+
+        const day = state.days.find(d => d.date === dateStr);
+        if (!day) return;
+
+        const uid = 'id_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+
+        if (type === 'plans') {
+          const start = document.getElementById('input-start-time').value || '09:00';
+          const end = document.getElementById('input-end-time').value || '10:00';
+          day.plans.push({ id: uid, start, end, text, done: false });
+        } else if (type === 'checkins') {
+          const tag = document.getElementById('input-subtag').value || '习惯';
+          if (!Array.isArray(day.checkins)) day.checkins = [];
+          day.checkins.push({ id: uid, tag, text, done: false });
+        } else if (type === 'reviews') {
+          const tag = document.getElementById('input-subtag').value;
+          day.reviews.push({ id: uid, tag, text });
+          day.pressed = true;
+        } else if (type === 'inspirations') {
+          const tag = document.getElementById('input-subtag').value;
+          day.inspirations.push({ id: uid, tag, text });
+          day.pressed = true;
+        }
+
+        saveState();
+        render();
+        closeAddItemModal();
+        showToast('已保存');
+      });
+
+      const modalAddPeriod = document.getElementById('modal-add-period');
+      function renderPeriodColorPicker(selectedKey) {
+        const container = document.getElementById('period-color-picker');
+        document.getElementById('input-period-color').value = selectedKey;
+        container.innerHTML = Object.entries(PERIOD_COLORS).map(([key, c]) => {
+          const active = key === selectedKey;
+          return `
+            <button type="button" data-color-key="${key}"
+              style="background:${c.bg}; border-color:${active ? c.dot : c.border}; color:${c.text};"
+              class="px-2.5 py-1 rounded-full border-2 text-xs font-semibold flex items-center gap-1.5 transition-transform ${active ? 'scale-105 shadow-sm' : 'opacity-80 hover:opacity-100'}">
+              <span style="background:${c.dot};" class="w-2.5 h-2.5 rounded-full"></span>
+              <span>${c.name}</span>
+            </button>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('period-color-picker').addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-color-key]');
+        if (!btn) return;
+        renderPeriodColorPicker(btn.dataset.colorKey);
+      });
+
+      function openPeriodModal(editId) {
+        const existing = editId ? state.periods.find(p => p.id === editId) : null;
+        document.getElementById('period-edit-id').value = existing ? existing.id : '';
+        document.getElementById('modal-period-title').textContent = existing ? '编辑时期规划' : '添加时期规划';
+        document.getElementById('input-period-title').value = existing ? existing.title : '';
+        document.getElementById('input-period-start').value = existing ? existing.startDate : '2026-11-17';
+        document.getElementById('input-period-end').value = existing ? existing.endDate : '2026-11-21';
+        document.getElementById('input-period-note').value = existing ? (existing.note || '') : '';
+        renderPeriodColorPicker(existing ? existing.colorKey : 'violet');
+
+        const delBtn = document.getElementById('btn-delete-period');
+        if (existing) {
+          delBtn.classList.remove('hidden');
+        } else {
+          delBtn.classList.add('hidden');
+        }
+
+        modalAddPeriod.classList.remove('hidden');
+        modalAddPeriod.classList.add('flex');
+      }
+
+      function closePeriodModal() {
+        modalAddPeriod.classList.add('hidden');
+        modalAddPeriod.classList.remove('flex');
+      }
+
+      document.getElementById('btn-open-add-period').addEventListener('click', function () {
+        openPeriodModal(null);
+      });
+      document.getElementById('btn-close-add-period').addEventListener('click', closePeriodModal);
+      document.getElementById('btn-cancel-add-period').addEventListener('click', closePeriodModal);
+
+      document.getElementById('btn-delete-period').addEventListener('click', function () {
+        const editId = document.getElementById('period-edit-id').value;
+        if (!editId) return;
+        state.periods = state.periods.filter(p => p.id !== editId);
+        saveState();
+        render();
+        closePeriodModal();
+        showToast('已删除时期规划');
+      });
+
+      document.getElementById('form-add-period').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const editId = document.getElementById('period-edit-id').value;
+        const title = document.getElementById('input-period-title').value.trim();
+        let startDate = document.getElementById('input-period-start').value;
+        let endDate = document.getElementById('input-period-end').value;
+        const colorKey = document.getElementById('input-period-color').value || 'violet';
+        const note = document.getElementById('input-period-note').value.trim();
+        if (!title || !startDate || !endDate) return;
+        if (startDate > endDate) {
+          const tmp = startDate;
+          startDate = endDate;
+          endDate = tmp;
+        }
+
+        if (editId) {
+          const p = state.periods.find(item => item.id === editId);
+          if (p) {
+            p.title = title;
+            p.startDate = startDate;
+            p.endDate = endDate;
+            p.colorKey = colorKey;
+            p.note = note;
+          }
+        } else {
+          state.periods.push({
+            id: 'per_' + Date.now(),
+            title,
+            startDate,
+            endDate,
+            colorKey,
+            note
+          });
+        }
+
+        saveState();
+        render();
+        closePeriodModal();
+        showToast('时期规划已保存');
+      });
+
+      window.addEventListener('resize', function () {
+        alignHorizontalAxis();
+      });
+
+      const ICLOUD_ACCOUNT_KEY = 'axisday_icloud_account_v1';
+      const ICLOUD_VAULT_PREFIX = 'axisday_icloud_vault_';
+      let icloudState = {
+        account: null,
+        autoBackup: true
+      };
+
+      function loadICloudAccount() {
+        try {
+          const raw = localStorage.getItem(ICLOUD_ACCOUNT_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.account) {
+              icloudState.account = parsed.account;
+              icloudState.autoBackup = parsed.autoBackup !== false;
+            }
+          }
+        } catch (e) {}
+        updateICloudUI();
+      }
+
+      function saveICloudAccount() {
+        try {
+          localStorage.setItem(ICLOUD_ACCOUNT_KEY, JSON.stringify(icloudState));
+        } catch (e) {}
+      }
+
+      function getICloudBackupRecord(account) {
+        if (!account) return null;
+        try {
+          const raw = localStorage.getItem(ICLOUD_VAULT_PREFIX + account.toLowerCase());
+          return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function performICloudBackup(silent) {
+        if (!icloudState.account) return;
+        try {
+          const nowStr = new Date().toLocaleString('zh-CN', { hour12: false });
+          const snapshot = {
+            account: icloudState.account,
+            updatedAt: nowStr,
+            daysCount: state.days.length,
+            days: state.days,
+            periods: state.periods
+          };
+          localStorage.setItem(ICLOUD_VAULT_PREFIX + icloudState.account.toLowerCase(), JSON.stringify(snapshot));
+          updateICloudUI();
+          if (!silent) {
+            showToast(`已成功备份 ${state.days.length} 天日程至 iCloud`);
+          }
+        } catch (e) {
+          if (!silent) showToast('iCloud 备份失败，请检查存储空间');
+        }
+      }
+
+      function autoBackupToICloud() {
+        if (icloudState.account && icloudState.autoBackup) {
+          performICloudBackup(true);
+        }
+      }
+
+      function updateICloudUI() {
+        const headerBtn = document.getElementById('btn-icloud-login');
+        const headerLabel = document.getElementById('icloud-btn-label');
+        const loggedOutView = document.getElementById('icloud-logged-out-view');
+        const loggedInView = document.getElementById('icloud-logged-in-view');
+        const accountDisplay = document.getElementById('icloud-account-display');
+        const lastBackupText = document.getElementById('icloud-last-backup-text');
+        const autoCheck = document.getElementById('checkbox-icloud-autobackup');
+
+        if (icloudState.account) {
+          if (headerBtn) {
+            headerBtn.classList.remove('bg-slate-900', 'hover:bg-slate-800');
+            headerBtn.classList.add('bg-sky-600', 'hover:bg-sky-700');
+          }
+          if (headerLabel) headerLabel.textContent = 'iCloud 已登录';
+          if (loggedOutView) loggedOutView.classList.add('hidden');
+          if (loggedInView) loggedInView.classList.remove('hidden');
+          if (accountDisplay) accountDisplay.textContent = icloudState.account;
+          if (autoCheck) autoCheck.checked = icloudState.autoBackup;
+
+          const record = getICloudBackupRecord(icloudState.account);
+          if (lastBackupText) {
+            lastBackupText.textContent = record
+              ? `上次备份：${record.updatedAt}（共 ${record.daysCount} 天）`
+              : '尚未创建 iCloud 备份，点击下方按钮立即备份';
+          }
+        } else {
+          if (headerBtn) {
+            headerBtn.classList.remove('bg-sky-600', 'hover:bg-sky-700');
+            headerBtn.classList.add('bg-slate-900', 'hover:bg-slate-800');
+          }
+          if (headerLabel) headerLabel.textContent = 'iCloud 登录';
+          if (loggedOutView) loggedOutView.classList.remove('hidden');
+          if (loggedInView) loggedInView.classList.add('hidden');
+        }
+      }
+
+      const modalICloud = document.getElementById('modal-icloud-backup');
+      function openICloudModal() {
+        updateICloudUI();
+        modalICloud.classList.remove('hidden');
+        modalICloud.classList.add('flex');
+      }
+      function closeICloudModal() {
+        modalICloud.classList.add('hidden');
+        modalICloud.classList.remove('flex');
+      }
+
+      document.getElementById('btn-icloud-login').addEventListener('click', openICloudModal);
+      document.getElementById('btn-close-icloud-modal').addEventListener('click', closeICloudModal);
+
+      document.getElementById('btn-apple-quick-signin').addEventListener('click', function () {
+        icloudState.account = 'apple-id@icloud.com';
+        saveICloudAccount();
+        performICloudBackup(true);
+        updateICloudUI();
+        showToast('已通过 Apple 账号登录并启用 iCloud 备份');
+      });
+
+      document.getElementById('form-icloud-email-login').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const email = document.getElementById('input-icloud-email').value.trim();
+        if (!email) return;
+        icloudState.account = email;
+        saveICloudAccount();
+        performICloudBackup(true);
+        updateICloudUI();
+        showToast(`已登录 ${email} 并启用 iCloud 备份`);
+      });
+
+      document.getElementById('btn-icloud-logout').addEventListener('click', function () {
+        icloudState.account = null;
+        saveICloudAccount();
+        updateICloudUI();
+        showToast('已退出 iCloud 账号（本地数据保留）');
+      });
+
+      document.getElementById('checkbox-icloud-autobackup').addEventListener('change', function (e) {
+        icloudState.autoBackup = e.target.checked;
+        saveICloudAccount();
+        if (icloudState.autoBackup) {
+          performICloudBackup(true);
+          showToast('已开启自动备份到 iCloud');
+        } else {
+          showToast('已关闭自动备份，可随时手动点击备份');
+        }
+      });
+
+      document.getElementById('btn-icloud-backup-now').addEventListener('click', function () {
+        performICloudBackup(false);
+      });
+
+      document.getElementById('btn-icloud-restore-now').addEventListener('click', function () {
+        if (!icloudState.account) return;
+        const record = getICloudBackupRecord(icloudState.account);
+        if (!record || !Array.isArray(record.days)) {
+          showToast('当前 iCloud 账号下暂无可恢复的备份');
+          return;
+        }
+        state.days = JSON.parse(JSON.stringify(record.days));
+        state.periods = Array.isArray(record.periods) ? JSON.parse(JSON.stringify(record.periods)) : [];
+        saveState();
+        render();
+        closeICloudModal();
+        showToast(`已从 iCloud 恢复 ${state.days.length} 天日程（${record.updatedAt}）`);
+      });
+
+      document.getElementById('btn-icloud-save-file').addEventListener('click', function () {
+        try {
+          const payload = {
+            app: 'AxisDay',
+            account: icloudState.account || 'local',
+            backedUpAt: new Date().toISOString(),
+            days: state.days,
+            periods: state.periods
+          };
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `AxisDay-iCloud备份-${TODAY_STR}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast('已生成备份文件，可在 iPhone/Mac 存储至「iCloud 云盘」');
+        } catch (err) {
+          showToast('生成备份文件失败');
+        }
+      });
+
+      (function initPWAAppMetadata() {
+        try {
+          const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0F172A"/><path d="M128 256h256m-72-72l72 72-72 72" stroke="#10B981" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
+          const iconUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(iconSvg);
+          const appleIconEl = document.getElementById('apple-touch-icon');
+          if (appleIconEl) appleIconEl.href = iconUrl;
+
+          const manifestObj = {
+            name: 'AxisDay 箭头日程轴',
+            short_name: 'AxisDay',
+            description: '箭头轴向日程、习惯打卡与灵感复盘软件',
+            start_url: '.',
+            display: 'standalone',
+            background_color: '#E2EAF2',
+            theme_color: '#0F172A',
+            icons: [
+              { src: iconUrl, sizes: '192x192', type: 'image/svg+xml' },
+              { src: iconUrl, sizes: '512x512', type: 'image/svg+xml' }
+            ]
+          };
+          const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/json' });
+          const manifestEl = document.getElementById('pwa-manifest');
+          if (manifestEl) manifestEl.href = URL.createObjectURL(manifestBlob);
+        } catch (e) {}
+      })();
+
+      loadState();
+      loadICloudAccount();
+      render();
+      requestAnimationFrame(() => {
+        const viewport = document.getElementById('axis-viewport');
+        const todayBtn = document.getElementById(`day-btn-${TODAY_STR}`);
+        if (viewport && todayBtn) {
+          const vpRect = viewport.getBoundingClientRect();
+          const btnRect = todayBtn.getBoundingClientRect();
+          viewport.scrollLeft += (btnRect.left + btnRect.width / 2 - vpRect.left) - viewport.clientWidth / 2;
+          viewport.scrollTop += (btnRect.top + btnRect.height / 2 - vpRect.top) - viewport.clientHeight / 2;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
