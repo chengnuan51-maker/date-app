@@ -2,11 +2,12 @@
   "name": "axisday-planner",
   "version": "1.0.0",
   "description": "AxisDay 箭头日程轴与灵感复盘应用",
+  "author": "AxisDay <support@axisday.app>",
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win --x64",
-    "build:mac": "electron-builder --mac"
+    "build:win": "electron-builder --win portable --x64",
+    "build:mac": "electron-builder --mac dmg"
   },
   "build": {
     "appId": "com.axisday.planner",
@@ -17,11 +18,7 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "target": "portable"
     },
     "mac": {
       "target": "dmg",
