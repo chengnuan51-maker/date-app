@@ -1,0 +1,124 @@
+name: Build AxisDay Installers
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-desktop:
+    name: Build ${{ matrix.os }} Installer
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate App Icon
+        run: |
+          node -e '
+          const fs = require("fs");
+          const zlib = require("zlib");
+          const w = 256, h = 256;
+          const raw = Buffer.alloc((w * 4 + 1) * h);
+          for (let y = 0; y < h; y++) {
+            raw[y * (w * 4 + 1)] = 0;
+            for (let x = 0; x < w; x++) {
+              const idx = y * (w * 4 + 1) + 1 + x * 4;
+              const isArrow = (y >= 118 && y <= 138 && x >= 64 && x <= 192) ||
+                              (Math.abs(x - 160 + Math.abs(y - 128)) < 14 && x >= 136 && x <= 192);
+              raw[idx]     = isArrow ? 16 : 15;
+              raw[idx + 1] = isArrow ? 185 : 23;
+              raw[idx + 2] = isArrow ? 129 : 42;
+              raw[idx + 3] = 255;
+            }
+          }
+          function crc32(buf) {
+            let c = ~0;
+            for (let i = 0; i < buf.length; i++) {
+              c ^= buf[i];
+              for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1));
+            }
+            return (~c) >>> 0;
+          }
+          function chunk(type, data) {
+            const len = Buffer.alloc(4); len.writeUInt32BE(data.length, 0);
+            const t = Buffer.from(type);
+            const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([t, data])), 0);
+            return Buffer.concat([len, t, data, crc]);
+          }
+          const ihdr = Buffer.alloc(13);
+          ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
+          ihdr[8] = 8; ihdr[9] = 6;
+          const png = Buffer.concat([
+            Buffer.from([137,80,78,71,13,10,26,10]),
+            chunk("IHDR", ihdr),
+            chunk("IDAT", zlib.deflateSync(raw)),
+            chunk("IEND", Buffer.alloc(0))
+          ]);
+          fs.writeFileSync("icon.png", png);
+          '
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Installer
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            npx electron-builder --win --x64
+          else
+            npx electron-builder --mac
+          fi
+        shell: bash
+
+      - name: Upload Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AxisDay-${{ matrix.os }}-Installer
+          path: |
+            dist/*.exe
+            dist/*.dmg
+          if-no-files-found: error
+
+  build-android-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js & Java
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Prepare Web Assets & Capacitor Android
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "AxisDay" "com.axisday.planner" --web-dir www
+          npx cap add android
+          npx cap sync android
+          cd android && chmod +x gradlew && ./gradlew assembleDebug
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AxisDay-Android-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
