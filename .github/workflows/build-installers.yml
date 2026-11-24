@@ -1,4 +1,4 @@
-name: Build AxisDay Installers
+name: Build AxisDay Desktop Installers
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
-      - run: npx electron-builder --win --x64
+      - run: npx electron-builder --win portable --x64
       - uses: actions/upload-artifact@v4
         with:
           name: AxisDay-Windows-EXE
@@ -30,43 +30,8 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
-      - run: npx electron-builder --mac
+      - run: npx electron-builder --mac dmg
       - uses: actions/upload-artifact@v4
         with:
           name: AxisDay-macOS-DMG
           path: dist/*.dmg
-
-  build-android:
-    name: Build Android APK
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - name: Build APK
-        run: |
-          mkdir -p www
-          cp index.html www/index.html
-          cat << 'EOF' > capacitor.config.json
-          {
-            "appId": "com.axisday.planner",
-            "appName": "AxisDay",
-            "webDir": "www"
-          }
-          EOF
-          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
-          npx cap add android
-          npx cap sync android
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: AxisDay-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
