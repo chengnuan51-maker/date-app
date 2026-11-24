@@ -1,7 +1,7 @@
 {
   "name": "axisday-planner",
   "version": "1.0.0",
-  "description": "AxisDay 箭头日程轴与灵感复盘桌面/移动应用",
+  "description": "AxisDay 箭头日程轴与灵感复盘应用",
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
@@ -24,7 +24,8 @@
       "allowToChangeInstallationDirectory": true
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "identity": null
     }
   },
   "devDependencies": {
